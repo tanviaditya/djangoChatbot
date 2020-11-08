@@ -8,7 +8,8 @@ import os
 
 class chatbot:
     def getDescription(disease):
-        path = os.path.join(settings.MODELS, 'symptom_Description.csv')
+        path = os.path.join(settings.MODELS, 'disease_description.csv')
+        print(path)
         dscp=pd.read_csv(path)
         r=dscp.loc[dscp['Disease']==disease]
         return r
@@ -56,6 +57,7 @@ class chatbot:
                                 symp.append(z)
                         else:
                             symp.append(words[i])
+            
             return(symp)
 
     def inputNLP(symp):

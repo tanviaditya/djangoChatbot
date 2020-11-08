@@ -9,7 +9,7 @@ from googletrans import Translator
 import http.client
 import json
 from time import sleep
-
+from .models import Symptom
 
 # Create your views here.
 def translateText(text,src,dest):
@@ -41,12 +41,12 @@ class call_model(APIView):
             data = request.GET.get('data')
             lang=request.GET.get('lang')
             symp=chatbot.symptomDetector(data)
-            print(data)
+            # print(data)
             translator = Translator()
-            final_input=chatbot.inputNLP(symp)
+            # final_input=chatbot.inputNLP(symp)
             greetings=["Hi","hi","Hi there", "How are you ?", "Is anyone there?","Hola", "Hello", "Good day","Hey"]
             greetings_response=["Hello", "Good to see you again", "Hi, How can I help?"]
-            exit_list=["Bye", "See you later", "Goodbye", "Nice chatting to you, bye", "Till next time","Thanks","Thank you"]
+            exit_list=["Bye", "See you later", "Goodbye", "Nice chatting to you, bye", "Till next time","Thanks","Thank you","Gratitude"]
             exit_respose= ["See you!", "Have a nice day", "Bye!","Bye"]
             reply=""
             d=""
@@ -62,17 +62,32 @@ class call_model(APIView):
                     reply=translateText(reply,'en',lang)
             else:
                 if len(symp)>0:
-                    if len(symp)<3:
+                    #add symptoms in database
+                    for s in symp:
+                            Symptom.objects.create(symptom=s)
+                    symp_list = Symptom.objects.all()
+                    if symp_list.count()<4: #length of symptoms in database
                         reply="Please enter few more symptoms"
                         if(lang!='en'):
                             reply=translateText(reply,'en',lang)
                     else:
+                        #derive symptoms from database
+                        symp_list = Symptom.objects.all().values('symptom')
+                        symp_list=list(symp_list)
+                        for i,s in enumerate(symp_list):
+                            symp_list[i]=symp_list[i].get('symptom')
+                        print("Final symptom list",symp_list)
+                        final_input=chatbot.inputNLP(symp_list)
                         predict=ChatbotConfig.pickled_model.predict([final_input])
-                        reply="You might have "+(predict[0])
+                        reply="You maybe suffering from "+(predict[0])
+                        #delete all
+                        Symptom.objects.all().delete()
                         if(lang!='en'):
                             reply=translateText(reply,'en',lang)
                         d=chatbot.getDescription(predict[0])
-                        d=d['Description'].values[0]
+                        print("Prediction ",predict)
+                        print("Here ",d)
+                        d=d['Description'].values[0].title()
                         if(lang!='en'):
                             d=translateText(d,'en',lang)
                         r=chatbot.getPrecautions(predict[0])

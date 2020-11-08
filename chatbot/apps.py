@@ -5,6 +5,6 @@ import pickle
 
 class ChatbotConfig(AppConfig):
     name = 'chatbot'
-    path = os.path.join(settings.MODELS, 'RandomForest.pkl')
+    path = os.path.join(settings.MODELS, 'FinalPickle.pkl')
     with open(path, 'rb') as pickled:
         pickled_model=pickle.load(pickled)
