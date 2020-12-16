@@ -52,13 +52,11 @@ while result == None:
     try:
         result = translator.translate(text, src='en', dest='hi').text
     except Exception as e:
-        # print(e)
+        print(e)
         translator = Translator()
         sleep(0.5)
         pass      
 
-
-# text=translator.translate(text, src='en', dest='hi').text
 print(result)
 
 
