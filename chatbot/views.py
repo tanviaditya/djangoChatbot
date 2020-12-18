@@ -5,22 +5,25 @@ from rest_framework.views import APIView
 import pandas as pd
 import random
 from chatbot.chat_file import chatbot
-from googletrans import Translator
+from google_trans_new import google_translator 
 import http.client
 import json
 from time import sleep
 from .models import Symptom
-
+import speech_recognition as sr
+from gtts import gTTS 
+from playsound import playsound
+import os 
 # Create your views here.
 def translateText(text,src,dest):
     result=None
-    translator = Translator()
+    translator = google_translator()
     while result == None:
         try:
-            result = translator.translate(text, src=src, dest=dest).text
+            result = translator.translate(text,lang_tgt=dest)
         except Exception as e:
             # print(e)
-            translator = Translator()
+            translator = google_translator()
             sleep(0.5)
             pass
     return result      
@@ -31,27 +34,55 @@ class translate(APIView):
             text = request.GET.get('text')
             lang=request.GET.get('lang')
             # translator = Translator()
-            text=translateText(text,lang,'en')
+            translator = google_translator() 
+            text = translator.translate(text,lang_tgt='en') 
             return JsonResponse({'text':text})
 
-class call_model(APIView):
+class listen(APIView):
+    
+    def get(self,request):
+        lang=request.GET.get('lang')
+        if request.method == 'GET':
+            r = sr.Recognizer()
+            with sr.Microphone() as source:
+                print("Talk")
+                audio_text = r.listen(source)
+                print("Time over, thanks")
+            try:
+                # using google speech recognition
+                text=r.recognize_google(audio_text,language =lang)
+            except:
+                print("Sorry, I did not get that")
+        return JsonResponse({'text':text})
 
+class speak(APIView):
+    def get(self,request):
+        lang=request.GET.get('lang')
+        text=request.GET.get('text')
+        if request.method == 'GET':
+            myobj = gTTS(text=text, lang=lang, slow=False) 
+            myobj.save("welcome.mp3")
+            playsound("welcome.mp3")
+            os.remove("welcome.mp3")
+        return JsonResponse({'text':text})
+
+class call_model(APIView):
     def get(self,request):
         if request.method == 'GET':
             data = request.GET.get('data')
             lang=request.GET.get('lang')
             symp=chatbot.symptomDetector(data)
             # print(data)
-            translator = Translator()
+            # translator = Translator()
             # final_input=chatbot.inputNLP(symp)
-            greetings=["Hi","hi","Hi there", "How are you ?", "Is anyone there?","Hola", "Hello", "Good day","Hey"]
+            greetings=["hi","hi there", "how are you ?", "is anyone there?","hola", "Hello", "good day","hey","hello"]
             greetings_response=["Hello", "Good to see you again", "Hi, How can I help?"]
-            exit_list=["Bye", "See you later", "Goodbye", "Nice chatting to you, bye", "Till next time","Thanks","Thank you","Gratitude"]
+            exit_list=["bye", "see you later", "goodbye", "nice chatting to you, bye", "till next time","thanks","thank you","gratitude"]
             exit_respose= ["See you!", "Have a nice day", "Bye!","Bye"]
             reply=""
             d=""
             p=""
-
+            data=data.strip()
             if data in greetings:
                 reply=random.choice(greetings_response)
                 if(lang!='en'):
