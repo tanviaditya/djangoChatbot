@@ -10,10 +10,13 @@ import http.client
 import json
 from time import sleep
 from .models import Symptom
+from .models import Record
 import speech_recognition as sr
 from gtts import gTTS 
 from playsound import playsound
 import os 
+import wikipedia
+
 # Create your views here.
 def translateText(text,src,dest):
     result=None
@@ -38,8 +41,7 @@ class translate(APIView):
             text = translator.translate(text,lang_tgt='en') 
             return JsonResponse({'text':text})
 
-class listen(APIView):
-    
+class listen(APIView):    
     def get(self,request):
         lang=request.GET.get('lang')
         if request.method == 'GET':
@@ -64,6 +66,13 @@ class speak(APIView):
             myobj.save("welcome.mp3")
             playsound("welcome.mp3")
             os.remove("welcome.mp3")
+        return JsonResponse({'text':text})
+
+class explore(APIView):
+    def get(self,request):
+        text=request.GET.get('text')
+        if request.method == 'GET':
+            text=(wikipedia.summary(text,sentences=4))
         return JsonResponse({'text':text})
 
 class call_model(APIView):
@@ -108,10 +117,14 @@ class call_model(APIView):
                         for i,s in enumerate(symp_list):
                             symp_list[i]=symp_list[i].get('symptom')
                         print("Final symptom list",symp_list)
+                        #from list to string
+                        str1 = " " 
+                        symp_string=(str1.join(symp_list))
                         final_input=chatbot.inputNLP(symp_list)
                         predict=ChatbotConfig.pickled_model.predict([final_input])
                         reply="You maybe suffering from "+(predict[0])
                         #delete all
+                        Record.objects.create(symptoms=symp_string,disease=predict[0])
                         Symptom.objects.all().delete()
                         if(lang!='en'):
                             reply=translateText(reply,'en',lang)
