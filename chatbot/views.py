@@ -16,7 +16,18 @@ from gtts import gTTS
 from playsound import playsound
 import os 
 import wikipedia
+import string
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+import nltk
+from nltk.stem import WordNetLemmatizer
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
+from chatbot.serializers import CancerImageSerializer
+from rest_framework.response import Response
+from rest_framework import status
 
+nltk.download('popular', quiet=True) 
 # Create your views here.
 def translateText(text,src,dest):
     result=None
@@ -41,6 +52,15 @@ class translate(APIView):
             text = translator.translate(text,lang_tgt='en') 
             return JsonResponse({'text':text})
 
+class cancer(APIView):
+    def post(self, request, *args, **kwargs):
+        serializer = CancerImageSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
 class listen(APIView):    
     def get(self,request):
         lang=request.GET.get('lang')
@@ -54,7 +74,7 @@ class listen(APIView):
                 # using google speech recognition
                 text=r.recognize_google(audio_text,language =lang)
             except:
-                print("Sorry, I did not get that")
+                text="Speak Again!"
         return JsonResponse({'text':text})
 
 class speak(APIView):
@@ -62,7 +82,7 @@ class speak(APIView):
         lang=request.GET.get('lang')
         text=request.GET.get('text')
         if request.method == 'GET':
-            myobj = gTTS(text=text, lang=lang, slow=False) 
+            myobj = gTTS(text=text, lang=lang, tld="com") 
             myobj.save("welcome.mp3")
             playsound("welcome.mp3")
             os.remove("welcome.mp3")
@@ -76,14 +96,42 @@ class explore(APIView):
         return JsonResponse({'text':text})
 
 class call_model(APIView):
-    def get(self,request):
+    def __init__(self):
+        self.lemmer = WordNetLemmatizer()
+        self.remove_punct_dict = dict((ord(punct), None) for punct in string.punctuation)
+    
+    def LemTokens(self,tokens):
+        return [self.lemmer.lemmatize(token) for token in tokens]
+
+    def LemNormalize(self,text):
+        return self.LemTokens(nltk.word_tokenize(text.lower().translate(self.remove_punct_dict)))
+
+    def response(self,user_response):
+        with open('chatbot\model\chatbot1.txt','r', encoding='utf8', errors ='ignore') as fin:
+            raw = fin.read().lower()
+        sent_tokens = nltk.sent_tokenize(raw)# converts to list of sentences 
+        word_tokens = nltk.word_tokenize(raw)
+        robo_response=''
+        sent_tokens.append(user_response)
+        TfidfVec = TfidfVectorizer(tokenizer=self.LemNormalize, stop_words='english')
+        tfidf = TfidfVec.fit_transform(sent_tokens)
+        vals = cosine_similarity(tfidf[-1], tfidf)
+        idx=vals.argsort()[0][-2]
+        flat = vals.flatten()
+        flat.sort()
+        req_tfidf = flat[-2]
+        if(req_tfidf==0):
+            robo_response=robo_response+"Please enter proper information!"
+            return robo_response
+        else:
+            robo_response = robo_response+sent_tokens[idx]
+            return robo_response
+
+    def get(self,request):        
         if request.method == 'GET':
             data = request.GET.get('data')
             lang=request.GET.get('lang')
             symp=chatbot.symptomDetector(data)
-            # print(data)
-            # translator = Translator()
-            # final_input=chatbot.inputNLP(symp)
             greetings=["hi","hi there", "how are you ?", "is anyone there?","hola", "Hello", "good day","hey","hello"]
             greetings_response=["Hello", "Good to see you again", "Hi, How can I help?"]
             exit_list=["bye", "see you later", "goodbye", "nice chatting to you, bye", "till next time","thanks","thank you","gratitude"]
@@ -143,7 +191,9 @@ class call_model(APIView):
                         if(lang!='en'):
                             p=translateText(p,'en',lang)
                 else:
-                    reply="Please enter symptoms you are facing"   
+                    #code of nltk here
+                    reply=self.response(data)
+                    # reply="Please enter symptoms you are facing"   
                     if(lang!='en'):
                         reply=translateText(reply,'en',lang)
             return JsonResponse({'data':reply,

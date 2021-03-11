@@ -24,4 +24,5 @@ urlpatterns = [
     path('listen/', chatbot_views.listen.as_view(),name='listen'),
     path('speak/', chatbot_views.speak.as_view(),name='speak'),
      path('explore/', chatbot_views.explore.as_view(),name='explore'),
+    path('cancer/', chatbot_views.cancer.as_view(),name='cancer'),
 ]
